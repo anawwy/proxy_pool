@@ -12,19 +12,19 @@
 """
 __author__ = 'JHao'
 
-from Util import validUsefulProxy
+from Util import validUsefulProxy, validUsefulProxyUnicom
 
 from datetime import datetime
 
 
-def checkProxyUseful(proxy_obj):
+def checkProxyUseful(proxy_obj, origin_ips):
     """
     检测代理是否可用
     :param proxy_obj: Proxy object
     :return: Proxy object, status
     """
 
-    if validUsefulProxy(proxy_obj.proxy):
+    if validUsefulProxyUnicom(proxy_obj.proxy, origin_ips):
         # 检测通过 更新proxy属性
         proxy_obj.check_count += 1
         proxy_obj.last_status = 1

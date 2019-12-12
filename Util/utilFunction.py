@@ -11,6 +11,7 @@
                    2016/11/25: 添加robustCrawl、verifyProxy、getHtmlTree
 -------------------------------------------------
 """
+
 import requests
 from lxml import etree
 
@@ -93,3 +94,66 @@ def validUsefulProxy(proxy):
         pass
     return False
 
+
+def validUsefulProxyUnicom(proxy, origin_ips):
+    """
+    检验代理是否可用
+    :param proxy:
+    :return:
+    """
+    if isinstance(proxy, bytes):
+        proxy = proxy.decode("utf8")
+    proxies = {"http": "http://{proxy}".format(proxy=proxy)}
+    is_ok = get_anonymity(proxies, origin_ips)
+    if not is_ok:
+        return False
+    try:
+        r = requests.get('https://vip.17wo.cn', headers={
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
+        }, proxies=proxies, timeout=10, verify=False)
+        if r.status_code == 200:
+            return True
+    except Exception as e:
+        pass
+    return False
+
+
+def get_origin_ips():
+    resp = requests.get('http://httpbin.org/get?show_env=1', timeout=10, verify=False)
+    if resp.status_code == 200:
+        data = resp.json()
+        origin_ip_str = data.get('origin')
+        if origin_ip_str:
+            return [ip.strip() for ip in origin_ip_str.split(',') if ip]
+    raise RuntimeError
+
+
+def get_anonymity(proxies, origin_ips):
+    try:
+        r = requests.get('http://httpbin.org/get?show_env=1', proxies=proxies, timeout=10, verify=False)
+        if r.status_code == 200:
+            data = r.json()
+
+            origin = data.get('origin')
+            if origin:
+                origin = {ip.strip() for ip in origin.split(',') if ip}
+            headers = data.get('headers')
+            x_forwarded_for = headers.get('X-Forwarded-For', None)
+            x_real_ip = headers.get('X-Real-Ip', None)
+            via = headers.get('Via', None)
+
+            if (origin - origin_ips) != origin:
+                anonymity = 3
+            elif via is not None:
+                anonymity = 2
+            elif x_forwarded_for is not None and x_real_ip is not None:
+                anonymity = 1
+                return True
+            else:
+                anonymity = 0
+    except Exception as e:
+        pass
+    return False

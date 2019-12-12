@@ -19,7 +19,7 @@ sys.path.append('../')
 
 from Schedule import doRawProxyCheck, doUsefulProxyCheck
 from Manager import ProxyManager
-from Util import LogHandler
+from Util import LogHandler, get_origin_ips
 
 
 class DoFetchProxy(ProxyManager):
@@ -35,24 +35,27 @@ class DoFetchProxy(ProxyManager):
         self.log.info("finish fetch proxy")
 
 
-def rawProxyScheduler():
+def rawProxyScheduler(origin_ips):
     DoFetchProxy().main()
-    doRawProxyCheck()
+    doRawProxyCheck(origin_ips)
 
 
-def usefulProxyScheduler():
-    doUsefulProxyCheck()
+def usefulProxyScheduler(origin_ips):
+    doUsefulProxyCheck(origin_ips)
 
 
 def runScheduler():
-    rawProxyScheduler()
-    usefulProxyScheduler()
+    origin_ips = get_origin_ips()
+    rawProxyScheduler(origin_ips)
+    usefulProxyScheduler(origin_ips)
 
     scheduler_log = LogHandler("scheduler_log")
     scheduler = BlockingScheduler(logger=scheduler_log)
 
-    scheduler.add_job(rawProxyScheduler, 'interval', minutes=5, id="raw_proxy_check", name="raw_proxy定时采集")
-    scheduler.add_job(usefulProxyScheduler, 'interval', minutes=1, id="useful_proxy_check", name="useful_proxy定时检查")
+    scheduler.add_job(rawProxyScheduler, 'interval', args=(origin_ips,), minutes=5, id="raw_proxy_check",
+                      name="raw_proxy定时采集")
+    scheduler.add_job(usefulProxyScheduler, 'interval', args=(origin_ips,), minutes=1, id="useful_proxy_check",
+                      name="useful_proxy定时检查")
 
     scheduler.start()
 

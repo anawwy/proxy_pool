@@ -19,7 +19,7 @@ try:
 except:
     from queue import Queue, Empty  # py3
 
-from Util import LogHandler
+from Util import LogHandler, get_origin_ips
 from Manager import ProxyManager
 from ProxyHelper import checkProxyUseful, Proxy
 
@@ -27,11 +27,12 @@ FAIL_COUNT = 0
 
 
 class UsefulProxyCheck(ProxyManager, Thread):
-    def __init__(self, queue, thread_name):
+    def __init__(self, queue, thread_name, origin_ips):
         ProxyManager.__init__(self)
         Thread.__init__(self, name=thread_name)
 
         self.queue = queue
+        self.origin_ips = origin_ips
         self.log = LogHandler('useful_proxy_check')
 
     def run(self):
@@ -45,7 +46,7 @@ class UsefulProxyCheck(ProxyManager, Thread):
                 break
 
             proxy_obj = Proxy.newProxyFromJson(proxy_str)
-            proxy_obj, status = checkProxyUseful(proxy_obj)
+            proxy_obj, status = checkProxyUseful(proxy_obj, self.origin_ips)
             if status or proxy_obj.fail_count < FAIL_COUNT:
                 self.db.put(proxy_obj)
                 self.log.info('UsefulProxyCheck - {}  : {} validation pass'.format(self.name,
@@ -57,7 +58,7 @@ class UsefulProxyCheck(ProxyManager, Thread):
             self.queue.task_done()
 
 
-def doUsefulProxyCheck():
+def doUsefulProxyCheck(origin_ips):
     proxy_queue = Queue()
 
     pm = ProxyManager()
@@ -67,7 +68,7 @@ def doUsefulProxyCheck():
 
     thread_list = list()
     for index in range(10):
-        thread_list.append(UsefulProxyCheck(proxy_queue, "thread_%s" % index))
+        thread_list.append(UsefulProxyCheck(proxy_queue, "thread_%s" % index, origin_ips))
 
     for thread in thread_list:
         thread.start()
@@ -77,4 +78,5 @@ def doUsefulProxyCheck():
 
 
 if __name__ == '__main__':
-    doUsefulProxyCheck()
+    origin_ips = get_origin_ips()
+    doUsefulProxyCheck(origin_ips)

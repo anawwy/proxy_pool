@@ -19,7 +19,7 @@ try:
 except:
     from queue import Empty, Queue  # py3
 
-from Util import LogHandler
+from Util import LogHandler, get_origin_ips
 from Manager import ProxyManager
 from ProxyHelper import Proxy, checkProxyUseful
 
@@ -28,6 +28,7 @@ class RawProxyCheck(ProxyManager, Thread):
     def __init__(self, queue, thread_name):
         ProxyManager.__init__(self)
         Thread.__init__(self, name=thread_name)
+        self.origin_ips = origin_ips
         self.log = LogHandler('raw_proxy_check')
         self.queue = queue
 
@@ -43,7 +44,7 @@ class RawProxyCheck(ProxyManager, Thread):
 
             proxy_obj = Proxy.newProxyFromJson(proxy_json)
 
-            proxy_obj, status = checkProxyUseful(proxy_obj)
+            proxy_obj, status = checkProxyUseful(proxy_obj, self.origin_ips)
             if status:
                 if self.db.exists(proxy_obj.proxy):
                     self.log.info('RawProxyCheck - {}  : {} validation exists'.format(self.name,
@@ -57,7 +58,7 @@ class RawProxyCheck(ProxyManager, Thread):
             self.queue.task_done()
 
 
-def doRawProxyCheck():
+def doRawProxyCheck(origin_ips):
     proxy_queue = Queue()
 
     pm = ProxyManager()
@@ -68,7 +69,7 @@ def doRawProxyCheck():
 
     thread_list = list()
     for index in range(20):
-        thread_list.append(RawProxyCheck(proxy_queue, "thread_%s" % index))
+        thread_list.append(RawProxyCheck(proxy_queue, "thread_%s" % index, origin_ips))
 
     for thread in thread_list:
         thread.start()
@@ -78,4 +79,5 @@ def doRawProxyCheck():
 
 
 if __name__ == '__main__':
-    doRawProxyCheck()
+    origin_ips = get_origin_ips()
+    doRawProxyCheck(origin_ips)
